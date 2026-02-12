@@ -128,7 +128,28 @@
       appId: "..."
     };
     ======================================================================================= */
-    const firebaseConfig = {}; // <-- keep empty for local-only mode
+    const firebaseConfig = {// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAifWz6QDFlnl4E44G8eMuSsUfqyEY4-Bk",
+  authDomain: "dotd-41844.firebaseapp.com",
+  databaseURL: "https://dotd-41844-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "dotd-41844",
+  storageBucket: "dotd-41844.firebasestorage.app",
+  messagingSenderId: "296857296525",
+  appId: "1:296857296525:web:28c0d95db01c15e77accc4",
+  measurementId: "G-XRVBHVQTS1"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);}; 
 
     // If you enable firebase, we lazy-load the SDK and use Realtime Database
     let useFirebase = false;
