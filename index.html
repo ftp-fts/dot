@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dark Hacker Board</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  <meta name="description" content="Anonymous hacker-style message board (static + optional Firebase)">
+
+  <style>
+    :root{
+      --bg:#060606; --panel:#071013; --glow:#00ff9f; --muted:#7f8c8d; --accent:#00ff9f; --card:#081212;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:radial-gradient(ellipse at 20% 10%, rgba(0,255,159,0.03), transparent 10%), var(--bg);font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial;color:#c8f8e0}
+    .container{max-width:1100px;margin:28px auto;padding:24px}
+    header{display:flex;align-items:center;gap:18px;margin-bottom:18px}
+    .logo{font-family:'Share Tech Mono',monospace;font-size:20px;color:var(--glow);text-shadow:0 0 12px rgba(0,255,159,0.14)}
+    .subtitle{color:var(--muted);font-size:13px}
+    .grid{display:grid;grid-template-columns:360px 1fr;gap:18px}
+    .panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(0,255,159,0.06);padding:14px;border-radius:10px}
+    label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+    input[type=text], textarea, input[type=tel]{width:100%;background:#030303;border:1px solid rgba(255,255,255,0.03);padding:10px;border-radius:6px;color:#dfffe9;font-family:Inter}
+    textarea{min-height:80px;resize:vertical}
+    .btn{display:inline-block;padding:10px 12px;border-radius:8px;background:linear-gradient(90deg,#022b1f,#063826);color:var(--bg);font-weight:600;cursor:pointer;margin-top:10px;border:1px solid rgba(255,255,255,0.03)}
+    .ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);font-size:13px;cursor:pointer}
+    .tiny{font-size:12px;color:var(--muted)}
+    .feed{min-height:60vh;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);background:linear-gradient(180deg, rgba(0,0,0,0.12), rgba(255,255,255,0.01))}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.00));border-radius:8px;padding:12px;margin-bottom:12px;border-left:4px solid rgba(0,255,159,0.12)}
+    .card h3{margin:0;font-family:'Share Tech Mono',monospace;font-size:15px}
+    .meta-row{display:flex;gap:12px;font-size:12px;color:var(--muted);margin-top:6px;align-items:center}
+    .content{margin-top:10px;line-height:1.45;color:#cffff0;white-space:pre-wrap}
+    .card-actions{display:flex;gap:8px;margin-top:10px}
+    .pill{padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02);font-size:13px;color:var(--muted)}
+    .count{font-family:'Share Tech Mono';color:var(--accent)}
+    .notice{font-size:13px;color:var(--muted);margin-top:10px}
+    .terminal{background:#000a08;color:var(--glow);font-family:'Share Tech Mono',monospace;padding:12px;border-radius:8px;border:1px solid rgba(0,255,159,0.06);margin-top:12px}
+    .cmd-row{display:flex;gap:10px;align-items:center}
+    .cmd-input{flex:1;background:transparent;border:none;outline:none;color:var(--glow);font-family:'Share Tech Mono',monospace}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+    body::after{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(0,0,0,0.02) 50%, transparent 50%);background-size:100% 4px;mix-blend-mode:overlay}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <div class="logo">darknet · board</div>
+        <div class="subtitle">anonymous posts • local-first • optional public mode</div>
+      </div>
+      <div style="margin-left:auto" class="tiny">host on GitHub Pages • add Firebase to go public</div>
+    </header>
+
+    <main class="grid">
+      <section class="left">
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div style="font-family:'Share Tech Mono';font-size:13px">new anonymous post</div>
+            <div class="tiny">no signup • optional name</div>
+          </div>
+
+          <div style="margin-top:10px">
+            <label>Nick (optional)</label>
+            <input id="nick" type="text" placeholder="alias (e.g. anon1337)">
+
+            <label style="margin-top:8px">Message</label>
+            <textarea id="message" placeholder="Your message — 1000 chars max"></textarea>
+
+            <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+              <button class="btn" id="postBtn">Post Anonymously</button>
+              <button class="ghost" id="exportBtn">Export JSON</button>
+              <label class="ghost" title="Import a JSON file of posts" style="cursor:pointer;padding:8px 10px;border-radius:8px;display:inline-flex;align-items:center">
+                Import JSON <input id="importFile" type="file" accept="application/json" style="display:none">
+              </label>
+            </div>
+
+            <div class="notice">This board is anonymous: do not post private info. Use responsibly.</div>
+            <div class="notice" id="modeInfo" style="margin-top:6px"></div>
+          </div>
+        </div>
+
+        <div class="terminal panel" style="margin-top:12px">
+          <div style="font-size:13px;margin-bottom:8px;color:var(--muted)">terminal · commands — try <code>help</code>, <code>clear</code>, <code>count</code>, <code>random</code></div>
+          <div class="cmd-row">
+            <span style="color:var(--muted);font-size:13px">guest@board:~$</span>
+            <input id="cmd" class="cmd-input" placeholder="type command and press Enter" autocomplete="off">
+          </div>
+          <pre id="termOut" style="margin-top:10px;color:var(--muted);font-size:13px;height:110px;overflow:auto"></pre>
+        </div>
+      </section>
+
+      <section class="right">
+        <div class="feed panel" id="feed">
+          <div id="empty" class="tiny" style="opacity:0.7">No posts yet — write something or import a feed.</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!--
+    PUBLIC MODE (optional)
+    ----------------------
+    To enable a public, shared board (so posts from different visitors sync in real-time),
+    create a Firebase project and Realtime Database (not Firestore), then paste the
+    firebaseConfig object below.
+
+    Steps summary:
+      1. Go to https://console.firebase.google.com/ and create a new project.
+      2. In the project, go to Realtime Database -> Create database -> Start in test mode.
+         (Test mode allows open read/write while you prototype. For production, secure it.)
+      3. Under Project Settings -> SDK Setup, copy the config object (apiKey, authDomain, databaseURL, projectId, etc.)
+      4. Paste it into the `firebaseConfig` below (replace the empty object).
+      5. Save & deploy to GitHub Pages. Everyone visiting the page will share the same board.
+
+    NOTE: Test mode is open-read/write. If you plan to go public, secure the database rules.
+  -->
+
+  <script>
+    /* ====== CONFIG: if you want a public shared board, paste your Firebase config here ======
+    Example:
+    const firebaseConfig = {
+      apiKey: "AIza...",
+      authDomain: "your-project.firebaseapp.com",
+      databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+      projectId: "your-project",
+      storageBucket: "...",
+      messagingSenderId: "...",
+      appId: "..."
+    };
+    ======================================================================================= */
+    const firebaseConfig = {}; // <-- keep empty for local-only mode
+
+    // If you enable firebase, we lazy-load the SDK and use Realtime Database
+    let useFirebase = false;
+    if (firebaseConfig && Object.keys(firebaseConfig).length > 0) useFirebase = true;
+
+    // Storage key for local fallback
+    const STORAGE_KEY = 'darknet_board_v1';
+    const feedEl = document.getElementById('feed');
+    const emptyEl = document.getElementById('empty');
+    const postBtn = document.getElementById('postBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importFile = document.getElementById('importFile');
+    const cmdInput = document.getElementById('cmd');
+    const termOut = document.getElementById('termOut');
+    const modeInfo = document.getElementById('modeInfo');
+
+    // Minimal sanitize: strip tags and limit length
+    function sanitize(s, max=1000){
+      if(!s) return '';
+      s = String(s).slice(0, max);
+      return s.replace(/[<>]/g, c => ({'<':'&lt;','>':'&gt;'}[c]));
+    }
+    function nowISO(){ return (new Date()).toISOString() }
+    function idGen(){ return 'm_' + Math.random().toString(36).slice(2,9) }
+
+    // Local storage functions
+    function loadLocal(){
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch(e){ return [] }
+    }
+    function saveLocal(posts){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
+    }
+
+    // Rendering
+    function renderPosts(posts){
+      // posts expected sorted oldest -> newest
+      // Clear old cards:
+      feedEl.querySelectorAll('.card').forEach(n => n.remove());
+      if(!posts || posts.length === 0){ emptyEl.style.display = 'block'; return }
+      emptyEl.style.display = 'none';
+      // show newest first
+      posts.slice().reverse().forEach(post => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        card.innerHTML = `
+          <h3>${sanitize(post.nick || 'anon')}</h3>
+          <div class="meta-row"><div class="pill">${timeAgo(post.created)}</div><div class="pill">id:${post.id}</div></div>
+          <div class="content">${sanitize(post.message)}</div>
+          <div class="card-actions">
+            <div class="pill">❤ <span class="count">${Number(post.votes||0)}</span></div>
+            <button class="ghost" data-action="upvote" data-id="${post.id}">upvote</button>
+            <button class="ghost" data-action="delete" data-id="${post.id}">delete</button>
+          </div>
+        `;
+        feedEl.appendChild(card);
+      });
+    }
+
+    function timeAgo(iso){
+      const d = new Date(iso);
+      const diff = Math.floor((Date.now()-d)/1000);
+      if(diff < 60) return diff + 's ago';
+      if(diff < 3600) return Math.floor(diff/60) + 'm ago';
+      if(diff < 86400) return Math.floor(diff/3600) + 'h ago';
+      return d.toLocaleString();
+    }
+
+    // Actions (local)
+    function postLocal(nick, message){
+      const posts = loadLocal();
+      const post = { id:idGen(), nick: nick || 'anon', message: sanitize(message, 1200), created: nowISO(), votes:0 };
+      posts.push(post);
+      saveLocal(posts);
+      renderPosts(posts);
+      flashTerm('posted: ' + post.id);
+      return post;
+    }
+    function upvoteLocal(id){
+      const posts = loadLocal();
+      const p = posts.find(x => x.id === id);
+      if(p){ p.votes = (Number(p.votes)||0) + 1; saveLocal(posts); renderPosts(posts); flashTerm('upvoted ' + id); }
+    }
+    function deleteLocal(id){
+      let posts = loadLocal();
+      posts = posts.filter(x => x.id !== id);
+      saveLocal(posts);
+      renderPosts(posts);
+      flashTerm('deleted ' + id);
+    }
+
+    // Event delegation for feed actions
+    feedEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if(!btn) return;
+      const action = btn.dataset.action;
+      const id = btn.dataset.id;
+      if(action === 'upvote'){
+        if(useFirebase) upvoteRemote(id); else upvoteLocal(id);
+      } else if(action === 'delete'){
+        if(useFirebase) deleteRemote(id); else deleteLocal(id);
+      }
+    });
+
+    // Export/Import
+    exportBtn.addEventListener('click', () => {
+      const posts = useFirebase ? null /*remote exported by admin*/ : loadLocal();
+      if(!posts){ flashTerm('export in public mode requires admin tools'); return }
+      const blob = new Blob([JSON.stringify(posts, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'board-export.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      flashTerm('exported ' + posts.length + ' posts');
+    });
+
+    importFile.addEventListener('change', async (e) => {
+      const f = e.target.files[0]; if(!f) return;
+      try {
+        const txt = await f.text();
+        const imported = JSON.parse(txt);
+        if(!Array.isArray(imported)) throw new Error('expected array');
+        if(useFirebase){ flashTerm('import to remote not implemented here'); return }
+        // merge locally
+        const posts = loadLocal();
+        const existing = new Set(posts.map(p => p.id));
+        const merged = posts.concat(imported.filter(p => !existing.has(p.id)).map(p => ({...p, id: p.id || idGen(), created: p.created || nowISO()})));
+        saveLocal(merged); renderPosts(merged); flashTerm('imported ' + imported.length + ' posts');
+      } catch(err){ flashTerm('import failed') }
+      importFile.value = '';
+    });
+
+    // post button
+    postBtn.addEventListener('click', async () => {
+      const nick = document.getElementById('nick').value.trim();
+      const message = document.getElementById('message').value.trim();
+      if(!message){ flashTerm('message required'); return }
+      if(useFirebase){ await postRemote(nick||'anon', message); } else { postLocal(nick||'anon', message); }
+      document.getElementById('message').value = '';
+    });
+
+    // terminal commands
+    cmdInput.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){
+        const raw = cmdInput.value.trim(); runCommand(raw); cmdInput.value = '';
+      }
+    });
+    function runCommand(raw){
+      if(!raw) return;
+      const parts = raw.split(/\s+/);
+      const cmd = parts[0].toLowerCase();
+      switch(cmd){
+        case 'help': printOut('commands: help | clear | random | count'); break;
+        case 'clear': if(useFirebase){ flashTerm('remote clear requires admin'); } else { localStorage.removeItem(STORAGE_KEY); renderPosts([]); printOut('local cleared'); } break;
+        case 'random': injectRandom(); break;
+        case 'count': printOut((useFirebase ? 'remote count not available' : loadLocal().length + ' posts')); break;
+        default: printOut('unknown command — try help');
+      }
+    }
+    function printOut(s){ termOut.textContent = s + '\n' + termOut.textContent; }
+    function flashTerm(s){ printOut('> ' + s); const old = document.title; document.title = s + ' · board'; setTimeout(()=>document.title = old, 1200); }
+
+    function injectRandom(){
+      const samples = [
+        {nick:'anon', message:'hello from the matrix'},
+        {nick:'ghost', message:'leaking vibes only'},
+        {nick:'root', message:'this board is a honeypot?'}
+      ];
+      const s = samples[Math.floor(Math.random()*samples.length)];
+      if(useFirebase) postRemote(s.nick, s.message); else postLocal(s.nick, s.message);
+    }
+
+    // Initial load: either remote or local
+    if(useFirebase){
+      modeInfo.textContent = 'Public mode: Firebase enabled. Loading remote posts...';
+      // Lazy-load firebase SDK
+      (async function initFirebase(){
+        try{
+          await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js');
+          await loadScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js');
+          // initialize
+          firebase.initializeApp(firebaseConfig);
+          window.dbRef = firebase.database().ref('darknet_board_v1/posts');
+          // listen for changes
+          dbRef.on('value', snap => {
+            const data = snap.val() || {};
+            const posts = Object.keys(data).map(k => data[k]).sort((a,b)=> new Date(a.created) - new Date(b.created));
+            renderPosts(posts);
+          });
+          modeInfo.textContent = 'Public mode: connected to Firebase (realtime).';
+          flashTerm('connected remote');
+        }catch(err){
+          modeInfo.textContent = 'Firebase load failed; falling back to local mode.';
+          console.error(err);
+          useFirebase = false;
+          initLocal();
+        }
+      })();
+    } else {
+      modeInfo.textContent = 'Local mode: posts are saved in your browser. Add Firebase config to go public.';
+      initLocal();
+    }
+
+    function initLocal(){
+      renderPosts(loadLocal());
+    }
+
+    // Remote functions (Firebase)
+    async function postRemote(nick, message){
+      const post = { id: idGen(), nick, message: sanitize(message,1200), created: nowISO(), votes:0 };
+      await dbRef.child(post.id).set(post);
+      flashTerm('posted remote: ' + post.id);
+    }
+    async function upvoteRemote(id){
+      const ref = dbRef.child(id + '/votes');
+      const snap = await ref.get();
+      const cur = snap.exists() ? Number(snap.val()) : 0;
+      await ref.set(cur + 1);
+      flashTerm('upvoted ' + id);
+    }
+    async function deleteRemote(id){
+      // Note: this will delete for everyone. For safety, remote delete is allowed here only if DB rules allow.
+      await dbRef.child(id).remove();
+      flashTerm('deleted remote ' + id);
+    }
+
+    // small helper: load script dynamically
+    function loadScript(src){
+      return new Promise((resolve,reject)=>{
+        const s = document.createElement('script'); s.src = src; s.onload = resolve; s.onerror = reject; document.head.appendChild(s);
+      });
+    }
+
+    // helper: allow drop import
+    window.addEventListener('dragover', e => e.preventDefault());
+    window.addEventListener('drop', async e => {
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if(!f) return;
+      if(f.type !== 'application/json') return;
+      const txt = await f.text();
+      try{
+        const imported = JSON.parse(txt);
+        if(!Array.isArray(imported)) throw new Error('expected array');
+        if(useFirebase){ flashTerm('remote import not implemented'); return }
+        const posts = loadLocal();
+        const existing = new Set(posts.map(p=>p.id));
+        const merged = posts.concat(imported.filter(p=>!existing.has(p.id)).map(p=>({...p, id: p.id || idGen(), created: p.created || nowISO()})));
+        saveLocal(merged); renderPosts(merged); flashTerm('dropped & imported');
+      }catch(err){ flashTerm('drop import failed') }
+    });
+
+    // render initial (local) if not firebase
+    if(!useFirebase) renderPosts(loadLocal());
+  </script>
+</body>
+</html>
